@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+/.kotlin
+app/src/main/res/drawable/placeholder_image1.jpg
+app/src/main/res/drawable/placeholder_image2.jpg

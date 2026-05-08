@@ -7,7 +7,6 @@ import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,8 +17,8 @@ import com.example.keep.ui.theme.MyAppIcons
 @Composable
 fun KeepBottomBar(modifier: Modifier = Modifier) {
     BottomAppBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
-    ) {
+        containerColor = MaterialTheme.colorScheme.background
+    ){
         NavigationBarItem(
             selected = true,
             icon = {

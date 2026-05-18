@@ -6,13 +6,8 @@ import java.time.Instant
 data class TimeStamp @OptIn(ExperimentalTime::class) constructor(
     val timeStampId: Int,
     val time: Instant,
-    val timeStampElements: List<TimeStampElement>
+    val timeStampElements: List<TimeStampElement> = emptyList()
     ){
-    var currentTimeStampId = 0
-
-    fun increaseTimeStampId(){
-        currentTimeStampId++
-    }
 }
 
 

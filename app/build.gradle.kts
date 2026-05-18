@@ -42,6 +42,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.coil)
     implementation(libs.androidx.compose.material.icons.extended)

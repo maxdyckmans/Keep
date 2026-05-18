@@ -22,9 +22,6 @@ data class TodayScreenState(
 )
 
 class TodayScreenViewmodel(): ViewModel() {
-    init {
-        Log.d("Debug", "ViewModel created")
-    }
     var currentTimestampId = 1
     private val _uiState = MutableStateFlow(TodayScreenState())
     val uiState = _uiState.asStateFlow()

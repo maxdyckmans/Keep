@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
@@ -17,8 +18,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -29,7 +32,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,18 +74,28 @@ import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.VerticalFloatingToolbar
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ModifierLocalBeyondBoundsLayout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -97,12 +112,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.ExperimentalTime
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import java.time.Instant
+import java.time.format.FormatStyle
+import java.util.Locale
 
 const val debugTag = "Debug"
-val dateTimeFormatter = DateTimeFormatter.ofPattern("hh:mm a").withZone(ZoneId.systemDefault())
+val dateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
 
 @Composable
@@ -125,15 +143,9 @@ fun TodayScreen(
     modifier: Modifier = Modifier,
     onViewmodelAction: (TodayScreenAction) -> Unit
 ) {
-    Log.d(debugTag, "TodayScreen Composition with State: $uiState")
+    //Log.d(debugTag, "TodayScreen Composition with State: $uiState")
 
     val listState = rememberLazyListState()
-
-    val lastItemFocusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(uiState.timeStamps.size) {
-        lastItemFocusRequester.requestFocus()
-    }
 
     Scaffold(
         bottomBar = { KeepBottomBar() },
@@ -160,10 +172,6 @@ fun TodayScreen(
 
                                 val xBuffer = 24.dp.toPx()
                                 val yBuffer = 12.dp.toPx()
-//                                Log.d("Debug", "Start: $listStart")
-//                                Log.d("Debug","Detected Tap at ${offset}")
-//                                Log.d("Debug", "Threshold for new Text at $threshold")
-//                                Log.d("Debug", "Offset after Correction ${offset.y + listStart - yBuffer}")
                                 if (
                                     xBuffer < offset.x &&
                                     screenWidth - xBuffer > offset.x &&
@@ -190,6 +198,7 @@ fun TodayScreen(
                         }
                     )
                 }
+
                 item {
                     DateAndImage(
                         imageOfTheDayUri = uiState.imageOfTheDay,
@@ -208,13 +217,10 @@ fun TodayScreen(
                         uiState.timeStamps.lastIndex == uiState.timeStamps.indexOf(timeStamp)
                                 && firstElement is TimeStampElement.Text
                                 && firstElement.text.isEmpty()
+
                     TimeStamp(
                         modifier = Modifier
-                            .animateItem()
-                            .padding(
-                                start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + 12.dp,
-                                end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + 6.dp
-                            ),
+                            .animateItem(),
                         timeStamp = timeStamp,
                         showDeleteButton = showDeleteButton,
                         onTimeStampDeleted = {
@@ -227,120 +233,17 @@ fun TodayScreen(
                         }
                     )
                 }
+
             }
         }
     }
 }
-
-@Composable
-fun AlternativeTodayScreen(
-    uiState: TodayScreenState,
-    modifier: Modifier = Modifier,
-    onViewmodelAction: (TodayScreenAction) -> Unit
-) {
-
-    val listState = rememberLazyListState()
-
-    Scaffold(
-        bottomBar = { KeepBottomBar() },
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            FABMenu()
-        }
-    ) { contentPadding ->
-        val screenWidth = LocalWindowInfo.current.containerSize.width
-        LazyColumn(
-            state = listState,
-            modifier = modifier
-                .fillMaxSize()
-                .pointerInput(null) {
-                    detectTapGestures { offset ->
-                        val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                        if (lastVisibleItem != null) {
-                            val lastVisibleItemOffset = lastVisibleItem.offset
-                            val lastVisibleItemSize = lastVisibleItem.size
-                            val threshold = lastVisibleItemOffset + lastVisibleItemSize
-                            val listStart = listState.layoutInfo.viewportStartOffset
-
-                            val xBuffer = 24.dp.toPx()
-                            val yBuffer = 12.dp.toPx()
-//                                Log.d("Debug", "Start: $listStart")
-//                                Log.d("Debug","Detected Tap at ${offset}")
-//                                Log.d("Debug", "Threshold for new Text at $threshold")
-//                                Log.d("Debug", "Offset after Correction ${offset.y + listStart - yBuffer}")
-                            if (
-                                xBuffer < offset.x &&
-                                screenWidth - xBuffer > offset.x &&
-                                threshold < offset.y + listStart - yBuffer
-                            ) {
-                                onViewmodelAction(TodayScreenAction.OnEmptySpaceClicked)
-                            }
-                        }
-                    }
-                },
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                AlternativeDateAndImage(
-                    contentPadding = contentPadding,
-                    imageOfTheDayUri = uiState.imageOfTheDay
-                ) { action ->
-                    onViewmodelAction(action)
-                }
-            }
-
-//                item{
-//                    HorizontalDivider(
-//                        modifier = Modifier.padding(top = 6.dp),
-//                        color = MaterialTheme.colorScheme.surfaceVariant,
-//                        thickness = 3.dp
-//                    )
-//                }
-//                item{
-//                    Title(modifier = Modifier.padding(start = 6.dp)) {  }
-//                }
-
-            items(
-                items = uiState.timeStamps,
-                key = { it.timeStampId }
-            ) { timeStamp ->
-                val firstElement = timeStamp.timeStampElements.firstOrNull()
-                val showDeleteButton =
-                    uiState.timeStamps.lastIndex == uiState.timeStamps.indexOf(timeStamp)
-                            && firstElement is TimeStampElement.Text
-                            && firstElement.text.isEmpty()
-
-                TimeStamp(
-                    modifier = Modifier
-                        .animateItem()
-                        .padding(
-                            start = contentPadding.calculateStartPadding(LayoutDirection.Ltr) + 12.dp,
-                            end = contentPadding.calculateEndPadding(LayoutDirection.Ltr) + 6.dp
-                        ),
-                    timeStamp = timeStamp,
-                    showDeleteButton = showDeleteButton,
-                    onTimeStampDeleted = { action ->
-                        onViewmodelAction(action)
-                    },
-                    onTextFieldEdited = { action ->
-                        onViewmodelAction(action)
-                    }
-                )
-            }
-        }
-    }
-}
-
-
 
 @Composable
 fun Title(
     modifier: Modifier = Modifier,
     onTitleDone: () -> Unit
 ) {
-    val focusManager = LocalFocusManager.current
     TextField(
         state = rememberTextFieldState(),
         textStyle = MaterialTheme.typography.titleLarge.copy(lineHeight = 30.sp),
@@ -359,84 +262,18 @@ fun Title(
             focusedContainerColor = Color.Transparent,
             unfocusedContainerColor = Color.Transparent
         ),
-        keyboardOptions = KeyboardOptions.Default.copy(
-            imeAction = ImeAction.Done
-        ),
-        onKeyboardAction =
-            { performDefaultAction ->
-                onTitleDone()
-                performDefaultAction
-            }
-        ,
         modifier = modifier
             .fillMaxWidth()
-    )
-}
-
-@Composable
-fun AlternativeDateAndImage(
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues,
-    imageOfTheDayUri: Uri?,
-    onImageOfTheDayPicked: (TodayScreenAction) -> Unit
-){
-    val imageHeight: Dp = 350.dp
-    val pixelImageHeight = with(LocalDensity.current){imageHeight.toPx()}
-
-    Text(
-        text = "24 November 2026",
-        style = MaterialTheme.typography.headlineMedium,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .padding(
-                top = contentPadding.calculateTopPadding(),
-                start = contentPadding.calculateStartPadding(LayoutDirection.Ltr),
-                end = contentPadding.calculateEndPadding(LayoutDirection.Ltr))
-            .padding(vertical = 6.dp)
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-    )
-
-    Box(){
-        ImageOfTheDay(
-            imageUri = imageOfTheDayUri,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(imageHeight)
-
-        ) {action ->
-            onImageOfTheDayPicked(action)
+            .onPreviewKeyEvent {
+            when {
+                KeyEventType.KeyUp == it.type && Key.Enter == it.key -> {
+                    onTitleDone()
+                    true
+                }
+                else -> false
+            }
         }
-        Box(
-            contentAlignment = Alignment.TopCenter,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(imageHeight)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            Color.Transparent
-                        ),
-                        startY = 0f,
-                        endY = pixelImageHeight / 3f
-                    )
-                )
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.background
-
-                        ),
-                        startY =  (3f/4f) * pixelImageHeight  ,
-                        endY = pixelImageHeight
-                    )
-                )
-        ){
-
-        }
-    }
+    )
 }
 
 @Composable
@@ -459,15 +296,14 @@ fun DateAndImage(
                 MaterialTheme.colorScheme.surfaceVariant,
                 shape = MaterialTheme.shapes.small
             ),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
 
         ImageOfTheDay(
             modifier = Modifier
                 .weight(1f)
-                .height(230.dp)
-                .widthIn(max = 400.dp),
+                .height(230.dp),
             imageUri = imageOfTheDayUri,
             onImageOfTheDayPicked = {action ->
                 onImageOfTheDayPicked(action)
@@ -551,16 +387,19 @@ fun FullImageOfTheDay(
 
 @Composable
 fun Date(modifier: Modifier = Modifier) {
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
-            .padding(end = 12.dp),
+            .width(60.dp)
+            .padding(end = 6.dp)
+            ,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "MON",
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.titleMedium
         )
         Text(
             text = "04\nNOV\n 2026",
@@ -579,74 +418,137 @@ fun TimeStamp(
     onTimeStampDeleted: (TodayScreenAction) -> Unit,
     onTextFieldEdited: (TodayScreenAction) -> Unit
 ) {
-    Column (
-        modifier = modifier.fillMaxWidth(1f),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.Start
-    ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            modifier = Modifier.height(40.dp)
-        ){
-            Column (
-                modifier = Modifier
-                    .weight(1f)
-                    .offset(y = 11.dp),
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                HorizontalDivider(modifier = Modifier)
-                Text(
-                    text = dateTimeFormatter.format(timeStamp.time),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
+
+    Row(
+        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ){
+        Log.d("Debug", "Time: ${timeStamp.time}")
+
+
+
+        Column (
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            val focusRequester = remember { FocusRequester() }
+
+            LaunchedEffect(showDeleteButton) {
+                focusRequester.requestFocus()
             }
-            AnimatedVisibility(showDeleteButton){
-                IconButton(
-                    onClick = {onTimeStampDeleted(
-                        TodayScreenAction.OnTimeStampDeleted(
-                            timeStamp.timeStampId
+
+
+
+            val lastText = timeStamp.timeStampElements.filterIsInstance<TimeStampElement.Text>().lastOrNull()
+
+            for (element in timeStamp.timeStampElements) {
+                when (element) {
+                    is TimeStampElement.Text -> {
+                        var mod = Modifier.fillMaxWidth()
+                        if (element == lastText){
+                            mod = mod.focusRequester(focusRequester)
+                        }
+                        KeepEntryTextField(
+                            value = element.text,
+                            onValueChange = { newValue ->
+                                onTextFieldEdited(
+                                    TodayScreenAction.OnTextFieldEdited(
+                                        timeStamp.timeStampId,
+                                        element.elementId,
+                                        newValue
+                                    )
+                                )
+                            },
+                            modifier = mod
+
                         )
-                    ) },
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = MyAppIcons.Close,
-                        contentDescription = "Remove Timestamp",
-                        tint = MaterialTheme.colorScheme.outline
-                    )
+                    }
+
+                    is TimeStampElement.ImageList ->
+                        ImageRow(
+                            element.images
+                        )
                 }
             }
+
         }
-
-        for(element in timeStamp.timeStampElements){
-            when (element){
-                is TimeStampElement.Text -> {
-
-                    KeepEntryTextField(
-                        value = element.text,
-                        onValueChange = {
-                            newValue -> onTextFieldEdited(
-                            TodayScreenAction.OnTextFieldEdited(
-                                timeStamp.timeStampId,
-                                element.elementId,
-                                newValue
+        Row(
+            modifier = Modifier.width(65.dp)
+        ){
+            VerticalDivider(
+                thickness = Dp.Hairline,
+                modifier = Modifier.padding(end = 6.dp)
+            )
+            AnimatedContent(targetState = showDeleteButton) { showButton ->
+                if (showButton) {
+                    IconButton(
+                        onClick = {onTimeStampDeleted(
+                            TodayScreenAction.OnTimeStampDeleted(
+                                timeStamp.timeStampId
                             )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
+                        ) },
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = MyAppIcons.Close,
+                            contentDescription = "Remove Timestamp",
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                } else {
+                    Text(
+                        text = dateTimeFormatter.format(timeStamp.time.atZone(ZoneId.systemDefault())),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
-
                 }
-                is TimeStampElement.ImageList ->
-                    ImageRow(
-                        element.images
-                    )
             }
+
         }
     }
+
+
+//        Row(
+//            verticalAlignment = Alignment.Top,
+//            modifier = Modifier.height(40.dp)
+//        ){
+//            Column (
+//                modifier = Modifier
+//                    .weight(1f)
+//                    .offset(y = 11.dp),
+//                verticalArrangement = Arrangement.Bottom
+//            ) {
+//                HorizontalDivider(modifier = Modifier)
+//                Text(
+//                    text = dateTimeFormatter.format(timeStamp.time),
+//                    style = MaterialTheme.typography.labelLarge,
+//                    color = MaterialTheme.colorScheme.outlineVariant
+//                )
+//            }
+//            AnimatedVisibility(showDeleteButton){
+//                IconButton(
+//                    onClick = {onTimeStampDeleted(
+//                        TodayScreenAction.OnTimeStampDeleted(
+//                            timeStamp.timeStampId
+//                        )
+//                    ) },
+//                    modifier = Modifier
+//                        .padding(start = 6.dp)
+//                        .size(24.dp)
+//                ) {
+//                    Icon(
+//                        imageVector = MyAppIcons.Close,
+//                        contentDescription = "Remove Timestamp",
+//                        tint = MaterialTheme.colorScheme.outline
+//                    )
+//                }
+//            }
+//        }
+
+
 }
 
 @Composable
